@@ -1,11 +1,3 @@
-#images
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.bmp
-*.ppm
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
