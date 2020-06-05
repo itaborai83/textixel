@@ -136,8 +136,7 @@ class App():
         img = img.filter(ImageFilter.UnsharpMask())
         #img.show()
         img = ImageOps.equalize(img)
-        #img.show()
-        
+        #img.show()        
         return img
             
     def build_new_image(self, img):
@@ -151,7 +150,6 @@ class App():
        
         num_lines = output_image.size[ 0 ] // tile_width
         num_columns = output_image.size[ 1 ] // tile_height
-        txt = []
         for j in range(num_columns):
             for i in range(num_lines):
                 x1 = i * tile_width
@@ -162,12 +160,7 @@ class App():
                 input_tile = processed_img.crop(crop_box)
                 output_tile = self.tile_set.translate_tile(input_tile)
                 output_image.paste(output_tile.img, crop_box)
-                txt.append(output_tile.char)
-            txt.append('\n')
         output_image.save(self.output)
-        txt = ''.join(txt)
-        with open(self.output + ".txt", "w") as fh:
-            print(txt, file=fh) 
         if self.show:
             output_image.show()
         
