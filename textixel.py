@@ -39,7 +39,7 @@ class Tile():
         if self.black_count < other.black_count:
             return True
         elif self.black_count == other.black_count:
-            return self.char < other.char
+            return self.inverse < other.inverse
         else:
             return False
             
@@ -145,7 +145,7 @@ class App():
         #img.show()
         img = img.filter(ImageFilter.UnsharpMask())
         #img.show()
-        img = ImageOps.equalize(img)
+        #img = ImageOps.equalize(img)
         #img.show()        
         return img
             
