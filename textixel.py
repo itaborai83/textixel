@@ -6,12 +6,13 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageStat, ImageFilter
 
 class Tile():
     
-    def __init__(self, char, width, height, font, use_alternates):
+    def __init__(self, char, width, height, font, use_alternates, inverse):
         self.char = char
         self.width = width
         self.height = height
         self.font = font
         self.use_alternates = use_alternates
+        self.inverse = inverse
         self.img = None
         self.black_count = 0
         self.min_color = None
@@ -19,9 +20,15 @@ class Tile():
         self.alternates = [self]
         
     def init(self):
-        self.img = Image.new(mode="1", size=(self.width, self.height), color=1)
+        if not self.inverse:
+            self.img = Image.new(mode="1", size=(self.width, self.height), color=1)
+        else:
+            self.img = Image.new(mode="1", size=(self.width, self.height), color=0)
         d = ImageDraw.Draw(self.img)
-        d.text((0,0), self.char, font=self.font, fill=0)
+        if not self.inverse:
+            d.text((0,0), self.char, font=self.font, fill=0)
+        else:
+            d.text((0,0), self.char, font=self.font, fill=1)
         for x in range(self.width):
             for y in range(self.height):
                 pixel = self.img.getpixel((x, y))
@@ -78,7 +85,10 @@ class TileSet():
         self.tiles = []
         tmp_tiles = []
         for ch in self.CHARS:
-            t = Tile(ch, width, height, font, self.use_alternates)
+            t = Tile(ch, width, height, font, self.use_alternates, inverse=False)
+            t.init()
+            tmp_tiles.append(t)
+            t = Tile(ch, width, height, font, self.use_alternates, inverse=True)
             t.init()
             tmp_tiles.append(t)
         # cull tiles
