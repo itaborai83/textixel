@@ -1,19 +1,22 @@
 import os
+import random
 import argparse
 import statistics as stats
-from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageStat
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageStat, ImageFilter
 
 class Tile():
     
-    def __init__(self, char, width, height, font):
+    def __init__(self, char, width, height, font, use_alternates):
         self.char = char
         self.width = width
         self.height = height
         self.font = font
+        self.use_alternates = use_alternates
         self.img = None
         self.black_count = 0
         self.min_color = None
         self.max_color = None
+        self.alternates = [self]
         
     def init(self):
         self.img = Image.new(mode="1", size=(self.width, self.height), color=1)
@@ -32,15 +35,21 @@ class Tile():
             return self.char < other.char
         else:
             return False
-        
+            
+    def pick(self):
+        if self.use_alternates:
+            return random.sample(self.alternates, 1)[ 0 ]
+        else:
+            return self
         
 class TileSet():
     
     CHARS = r""" '1234567890-="!@#$%&*()_+qwertyuiop[QWERTYUIOP`{asdfghjkl~]ASDFGHJKL^}\zxcvbnm,.;/|ZXCVBNM<>:?"""
     FONT_NAME = "FreeMono.ttf" # https://github.com/python-pillow/Pillow/blob/master/Tests/fonts/FreeMono.ttf
     
-    def __init__(self, fontsize):
+    def __init__(self, fontsize, use_alternates):
         self.fontsize = fontsize
+        self.use_alternates = use_alternates
         self.tiles = []
         self.color_indexes = []
         self.colors = [ None ] * 256
@@ -61,15 +70,15 @@ class TileSet():
             w, h = font.getsize(c)
             ws.append(w)
             hs.append(h)
-        width = stats.mode(ws)
-        height = stats.mode(hs)
+        width = max(ws)
+        height = max(hs)
         return width, height
     
     def _build_tiles(self, font, width, height):   
         self.tiles = []
         tmp_tiles = []
         for ch in self.CHARS:
-            t = Tile(ch, width, height, font)
+            t = Tile(ch, width, height, font, self.use_alternates)
             t.init()
             tmp_tiles.append(t)
         # cull tiles
@@ -79,6 +88,8 @@ class TileSet():
         for tile in tmp_tiles:
             if tile.black_count != last_black_count:
                 self.tiles.append(tile)
+            else:
+                self.tiles[ -1 ].alternates.append(tile)
             last_black_count = tile.black_count
     
     def _build_color_map(self):
@@ -92,70 +103,82 @@ class TileSet():
             else:
                 tile.max_color = color
             self.colors[ color ] = tile
-        
+    
+    def color_count(self):
+        return len(self.tiles)
+    
     def translate_tile(self, input_tile):
-        color = ImageStat.Stat(input_tile).median[ 0 ]
-        return self.colors[ color ].img
+        color = round(ImageStat.Stat(input_tile).median[ 0 ])
+        #color = round(ImageStat.Stat(input_tile).mean[ 0 ])
+        
+        return self.colors[ 255 - color ].pick()
     
 class App():
     
     CHAR_ASPECT_RATIO = 0.5 # width / height
     
-    def __init__(self, show, fontsize, input_, output):
+    def __init__(self, alternates, show, fontsize, input_, output):
         self.show = show
         self.fontsize = fontsize
         self.input = input_
         self.output = output
-        self.tile_set = TileSet(fontsize)
+        self.tile_set = TileSet(fontsize, alternates)
         
-    
-    def read_image(self):
-        return Image.open(self.input)
-    
-    def resize(self, img, tile_width, tile_height):
+    def process_image(self, img, tile_width, tile_height):
+        # crop image
         img_width, img_height = img.size
         new_width = (img_width // tile_width) * tile_width
         new_height = (img_height // tile_height) * tile_height
         crop_box = (0, 0, new_width, new_height)
-        return img.crop(crop_box)
-        
-    def convert_to_gray(self, img):
+        img = img.crop(crop_box)
         img = img.convert(mode="L")
-        img = ImageOps.autocontrast(img)
+        #img.show()
+        img = img.filter(ImageFilter.UnsharpMask())
+        #img.show()
+        img = ImageOps.equalize(img)
+        #img.show()
+        
         return img
-    
+            
     def build_new_image(self, img):
         return Image.new("L", img.size, 255)
     
     def run(self):
         tile_width, tile_height = self.tile_set.init()
-        img = self.read_image()
-        resized_img = self.resize(img, tile_width, tile_height)
-        bw_img = self.convert_to_gray(resized_img)
-        output_image = self.build_new_image(bw_img)
-        
+        img = Image.open(self.input)
+        processed_img = self.process_image(img, tile_width, tile_height)
+        output_image = self.build_new_image(processed_img)
+       
         num_lines = output_image.size[ 0 ] // tile_width
         num_columns = output_image.size[ 1 ] // tile_height
-        for i in range(num_lines):
-            for j in range(num_columns):
+        txt = []
+        for j in range(num_columns):
+            for i in range(num_lines):
                 x1 = i * tile_width
                 y1 = j * tile_height
                 x2 = (i * tile_width) + tile_width
                 y2 = (j * tile_height) + tile_height
                 crop_box = (x1, y1, x2, y2)
-                input_tile = bw_img.crop(crop_box)
+                input_tile = processed_img.crop(crop_box)
                 output_tile = self.tile_set.translate_tile(input_tile)
-                output_image.paste(output_tile, crop_box)
+                output_image.paste(output_tile.img, crop_box)
+                txt.append(output_tile.char)
+            txt.append('\n')
         output_image.save(self.output)
+        txt = ''.join(txt)
+        with open(self.output + ".txt", "w") as fh:
+            print(txt, file=fh) 
         if self.show:
             output_image.show()
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--alternates', action="store_true", help='use alternate tiles for the same gray value')
     parser.add_argument('--show', action="store_true", help='show image')
     parser.add_argument('--fontsize', type=int, default=12, help='font size to use')
     parser.add_argument('input', type=str, help='input image file name')
     parser.add_argument('output', type=str, help='output image file name')
     args = parser.parse_args()
-    app = App(args.show, args.fontsize, args.input, args.output)
+    app = App(args.alternates, args.show, args.fontsize, args.input, args.output)
     app.run()
+    
