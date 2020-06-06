@@ -11,7 +11,7 @@
 ## About
 
 This program creates a new image from an existing one
-mapping small tiles from the original image to dinamically
+mapping small tiles from the original image to dynamically
 generated tiles built from ascii letters.
 
 The dynamic tiles work like an ad hoc dithering algorithm,
@@ -25,9 +25,9 @@ I was inspired to use this approach after seeing some
 implementations using pixel by pixel translation which
 deforms the aspect ratio 
 
-The examples directory have some interesting before and after images.
+The examples directory has some interesting before and after images.
 
-## Instalation 
+## Installation 
 
 First clone this repository locally.
 
